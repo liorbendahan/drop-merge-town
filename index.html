@@ -50,11 +50,12 @@
           <div class="hero" aria-hidden="true">
             <img src="assets/building-3.png" alt="">
             <img src="assets/animal-3.png" alt="">
-            <img src="assets/treasure-3.png" alt="">
+            <img src="assets/food-3.png" alt="">
           </div>
           <h2>Drop. Match. Evolve.</h2>
           <p class="tagline">Land an object on its twin to evolve it. Chain matches for combos.</p>
           <ul id="chains" class="chains" aria-label="Object families"></ul>
+          <p class="joker-note"><img src="assets/wild-1.png" alt="Joker"> The joker matches anything.</p>
           <button id="btn-start" class="btn primary">▶ Start Game</button>
           <button id="btn-dashboard" class="btn">Dashboard</button>
         </div>
@@ -64,6 +65,33 @@
           <ol id="score-list"></ol>
           <p id="score-empty">No scores saved yet.</p>
           <button id="btn-back" class="btn">Back</button>
+        </div>
+
+        <div id="screen-tutorial" class="screen hidden">
+          <h2>How to play</h2>
+          <ul class="tips">
+            <li>
+              <span class="tip-icon">⬇️</span>
+              <strong>Drop</strong>
+              <span>Press <kbd>Space</kbd> or tap to drop the moving object into the slot below it.</span>
+            </li>
+            <li>
+              <span class="tip-icon">✨</span>
+              <strong>Match</strong>
+              <span>Same object twice: it evolves. Different objects: both break.</span>
+            </li>
+            <li>
+              <span class="tip-icon">🔁</span>
+              <strong>Swap &amp; discard</strong>
+              <span>Click a slot to swap with it. <kbd>D</kbd> throws the moving object away.</span>
+            </li>
+          </ul>
+          <div class="countdown" aria-live="polite">
+            <span>Starting in</span>
+            <strong id="tutorial-count">3</strong>
+            <div class="count-track"><div id="tutorial-bar" class="count-bar"></div></div>
+          </div>
+          <button id="btn-skip" class="btn">Play now</button>
         </div>
 
         <div id="screen-gameover" class="screen hidden">
@@ -96,6 +124,23 @@
     </div>
   </main>
 
-  <script src="game.js"></script>
+  <!-- Classic scripts in dependency order (no build step, works from file://).
+       Model first, then views, then the game that wires them together. -->
+  <script src="js/config.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/gameObject.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/scorer.js"></script>
+  <script src="js/spawner.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/objectView.js"></script>
+  <script src="js/boardView.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/screens.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>
