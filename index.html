@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Drop &amp; Merge Town</title>
+  <title>Mergefall</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -13,7 +13,7 @@
   <div class="bg" aria-hidden="true"></div>
 
   <main id="app">
-    <h1 class="logo">Drop &amp; Merge Town</h1>
+    <h1 class="logo">Mergefall</h1>
 
     <div id="hud">
       <div class="pill">
@@ -35,9 +35,13 @@
     </div>
 
     <div id="board">
+      <img class="cloud c1" src="assets/cloud.png" alt="">
+      <img class="cloud c2" src="assets/cloud.png" alt="">
+      <img class="cloud c3" src="assets/cloud.png" alt="">
       <div id="rail"></div>
       <div id="beam"></div>
       <div id="slots"></div>
+      <div id="drop-shadow" class="hidden"></div>
       <div id="piece"><div class="obj empty"></div></div>
       <canvas id="fx"></canvas>
 
@@ -46,15 +50,11 @@
           <div class="hero" aria-hidden="true">
             <img src="assets/building-3.png" alt="">
             <img src="assets/animal-3.png" alt="">
-            <img src="assets/food-3.png" alt="">
+            <img src="assets/treasure-3.png" alt="">
           </div>
-          <h2>Ready to play?</h2>
-          <p class="tagline">Time your drop, match to evolve, chain combos.</p>
-          <ul class="chains" aria-label="Evolution chains">
-            <li><img src="assets/building-1.png" alt="Shack">›<img src="assets/building-2.png" alt="House">›<img src="assets/building-3.png" alt="Skyscraper"></li>
-            <li><img src="assets/food-1.png" alt="Wheat">›<img src="assets/food-2.png" alt="Bread">›<img src="assets/food-3.png" alt="Meal"></li>
-            <li><img src="assets/animal-1.png" alt="Egg">›<img src="assets/animal-2.png" alt="Chick">›<img src="assets/animal-3.png" alt="Rooster"></li>
-          </ul>
+          <h2>Drop. Match. Evolve.</h2>
+          <p class="tagline">Land an object on its twin to evolve it. Chain matches for combos.</p>
+          <ul id="chains" class="chains" aria-label="Object families"></ul>
           <button id="btn-start" class="btn primary">▶ Start Game</button>
           <button id="btn-dashboard" class="btn">Dashboard</button>
         </div>
@@ -67,7 +67,7 @@
         </div>
 
         <div id="screen-gameover" class="screen hidden">
-          <h2>Time's up!</h2>
+          <h2 id="gameover-title">Time's up!</h2>
           <p class="final">Score <strong id="final-score">0</strong></p>
           <form id="save-form">
             <input id="player-name" type="text" maxlength="16" placeholder="Your name" autocomplete="off">
@@ -80,15 +80,19 @@
     </div>
 
     <div id="controls">
-      <button id="btn-trash" type="button" tabindex="-1" aria-label="Discard the moving object">
+      <button id="btn-trash" class="tool" type="button" tabindex="-1" aria-label="Discard the moving object">
         <img src="assets/trash.png" alt="">
         <span>Discard <kbd>D</kbd></span>
       </button>
       <p id="help">
-        <kbd>Space</kbd> or tap above the slots to drop.
+        <kbd>Space</kbd> or tap to drop.
         Click a filled slot to swap it with the moving object.
-        Stuck? Discard the moving object.
+        Stuck? Discard it.
       </p>
+      <button id="btn-sound" class="tool" type="button" tabindex="-1" aria-label="Toggle sound">
+        <span class="icon">🔊</span>
+        <span>Sound <kbd>M</kbd></span>
+      </button>
     </div>
   </main>
 

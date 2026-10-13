@@ -2,6 +2,7 @@
    Theme
    ========================================================================== */
 :root {
+  --tilt: 32deg; /* how far the slot platform leans back */
   --bg: #f1f5ff;
   --ink: #1f2547;
   --ink-dim: #6b7399;
@@ -102,7 +103,7 @@ body {
   border-radius: 16px;
   background: var(--glass);
   border: 2px solid var(--glass-border);
-  box-shadow: 0 10px 24px var(--shadow);
+  box-shadow: 0 4px 0 #d9dff8, 0 10px 24px var(--shadow);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -256,51 +257,84 @@ body {
 }
 
 /* ==========================================================================
-   Slots: recessed wells
+   Slots: a row of 3D platforms leaning back into the board
    ========================================================================== */
 #slots {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: calc(var(--obj) + 52px);
+  z-index: 1;
+  height: calc(var(--obj) + 80px);
   display: flex;
-  gap: clamp(5px, 1.6vw, 12px);
-  padding: 0 clamp(8px, 1.8vw, 14px) 18px;
+  gap: clamp(6px, 1.8vw, 14px);
+  padding: 0 clamp(10px, 2vw, 18px) 42px; /* room below for the front faces */
+  transform: perspective(760px) rotateX(var(--tilt));
+  transform-origin: 50% 100%;
+  transform-style: preserve-3d;
 }
 
 .slot {
   position: relative;
   flex: 1;
   min-width: 0;
+  transform-style: preserve-3d;
 }
 
+/* Top face of the platform. */
 .well {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 18px 18px 22px 22px;
+  border-radius: 14px;
   background:
-    radial-gradient(110% 60% at 50% 108%, rgba(115, 87, 255, 0.35), transparent 65%),
-    linear-gradient(180deg, #b9c3ea 0%, #dbe2f8 50%, #f4f6ff 100%);
+    radial-gradient(100% 70% at 50% 100%, rgba(115, 87, 255, 0.25), transparent 70%),
+    linear-gradient(180deg, #c3cdf3 0%, #e4e9fb 45%, #f6f8ff 100%);
   box-shadow:
-    inset 0 16px 18px -4px rgba(50, 60, 130, 0.5),
-    inset 0 -3px 5px rgba(255, 255, 255, 0.95),
-    0 0 0 3px #fff,
-    0 8px 0 #c7cff0,
-    0 16px 20px rgba(70, 80, 160, 0.35);
+    inset 0 0 0 3px #fff,
+    inset 0 14px 18px -8px rgba(50, 60, 130, 0.45),
+    0 40px 30px -14px rgba(50, 60, 130, 0.35);
+  transform-style: preserve-3d;
   transition: box-shadow 0.15s;
+}
+
+/* Front face: hangs straight down from the platform's front edge. */
+.well::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 24px;
+  border-radius: 0 0 14px 14px;
+  background: linear-gradient(180deg, #a9b4e8, #7a86cb);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.35), inset 0 -4px 6px rgba(40, 50, 110, 0.35);
+  transform-origin: 50% 0;
+  transform: rotateX(calc(-1 * var(--tilt)));
+  transition: background 0.15s;
+}
+
+/* The object stands upright on the platform, like a figure on a board. */
+.stand {
+  position: absolute;
+  left: 50%;
+  bottom: 14%;
+  width: var(--obj);
+  height: var(--obj);
+  transform-origin: 50% 100%;
+  transform: translateX(-50%) rotateX(calc(-1 * var(--tilt)));
+  transform-style: preserve-3d;
 }
 
 .slot.target .well {
   box-shadow:
-    inset 0 16px 18px -4px rgba(50, 60, 130, 0.5),
-    inset 0 -3px 5px rgba(255, 255, 255, 0.95),
-    0 0 0 3px var(--cyan),
-    0 0 22px rgba(25, 184, 255, 0.7),
-    0 8px 0 #9fd8f5,
-    0 16px 20px rgba(70, 80, 160, 0.35);
+    inset 0 0 0 3px var(--cyan),
+    inset 0 14px 18px -8px rgba(25, 184, 255, 0.5),
+    0 0 26px rgba(25, 184, 255, 0.7),
+    0 40px 30px -14px rgba(50, 60, 130, 0.35);
+}
+
+.slot.target .well::after {
+  background: linear-gradient(180deg, #8fd7f7, #3fb3e8);
 }
 
 .slot.filled {
@@ -317,7 +351,8 @@ body {
   position: absolute;
   inset: -3px;
   z-index: 2;
-  border-radius: 18px 18px 22px 22px;
+  border-radius: 14px;
+  transform: translateZ(1px); /* sits just above the platform's top face */
   background: color-mix(in srgb, var(--flash) 35%, transparent);
   box-shadow: 0 0 0 4px var(--flash), 0 0 30px var(--flash);
   opacity: 0;
@@ -371,6 +406,8 @@ body {
 .cat-building { --c: #19b8ff; --c-dark: #0b7fc0; --c-deep: #075a8a; }
 .cat-food     { --c: #ffb21e; --c-dark: #d97a0a; --c-deep: #99520a; }
 .cat-animal   { --c: #ff5fb7; --c-dark: #c22a84; --c-deep: #861759; }
+.cat-nature   { --c: #2ecc71; --c-dark: #1f8f4e; --c-deep: #135c32; }
+.cat-treasure { --c: #a855f7; --c-dark: #7a2fd0; --c-deep: #4e1b8a; }
 
 .obj {
   position: relative;
@@ -755,7 +792,7 @@ input::placeholder {
 }
 
 /* Discard bin. --cd runs from 1 to 0 while it cools down. */
-#btn-trash {
+.tool {
   --cd: 0;
   position: relative;
   flex: none;
@@ -779,13 +816,24 @@ input::placeholder {
   transition: transform 0.1s, box-shadow 0.1s;
 }
 
-#btn-trash img {
+.tool img,
+.tool .icon {
   width: 44px;
   height: 44px;
   filter: drop-shadow(0 5px 4px rgba(40, 50, 110, 0.35));
 }
 
-#btn-trash:active {
+.tool .icon {
+  font-size: 30px;
+  line-height: 44px;
+}
+
+.tool.off .icon {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.tool:active {
   transform: translateY(4px);
   box-shadow: 0 1px 0 #cdd5f5, 0 4px 8px var(--shadow);
 }
@@ -814,8 +862,83 @@ input::placeholder {
 #help {
   flex: 1;
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  text-align: center;
   color: var(--ink-dim);
+}
+
+/* ==========================================================================
+   Board dressing and popups
+   ========================================================================== */
+.cloud {
+  position: absolute;
+  left: 0;
+  z-index: 0;
+  width: 110px;
+  opacity: 0.9;
+  pointer-events: none;
+  animation: cloud-drift linear infinite;
+}
+
+.cloud.c1 { top: 14%; width: 120px; animation-duration: 42s; animation-delay: -10s; }
+.cloud.c2 { top: 32%; width: 80px; opacity: 0.7; animation-duration: 58s; animation-delay: -35s; }
+.cloud.c3 { top: 48%; width: 58px; opacity: 0.5; animation-duration: 70s; animation-delay: -20s; }
+
+@keyframes cloud-drift {
+  from { transform: translateX(-140px); }
+  to   { transform: translateX(760px); }
+}
+
+/* Shadow the falling object casts on its target platform. */
+#drop-shadow {
+  position: absolute;
+  z-index: 2;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(40, 50, 110, 0.6), rgba(40, 50, 110, 0));
+  pointer-events: none;
+}
+
+.announce {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  z-index: 5;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 2.2rem;
+  color: var(--purple);
+  text-shadow: 0 3px 0 #fff, 0 -2px 0 #fff, 3px 0 0 #fff, -3px 0 0 #fff, 0 10px 20px rgba(40, 50, 110, 0.3);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: announce 1.3s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+
+.announce.time {
+  top: 30%;
+  font-size: 1.8rem;
+  color: var(--cyan);
+}
+
+.announce.unlock {
+  color: var(--pink);
+}
+
+@keyframes announce {
+  0%   { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+  20%  { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  70%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -90%) scale(1); opacity: 0; }
+}
+
+.chains li.locked img {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+.chains .lock {
+  margin-left: 4px;
+  font-size: 0.72rem;
+  color: var(--purple);
 }
 
 kbd {
@@ -834,6 +957,7 @@ kbd {
   #board.shake,
   .obj.stage-3::before,
   .hero img,
+  .cloud,
   #time-pill.danger {
     animation: none;
   }

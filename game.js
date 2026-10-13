@@ -4,24 +4,29 @@ const GAME_SECONDS = 60;
 const BASE_SPEED = 320;      // spawner px per second outside a combo
 const COMBO_SPEEDUP = 1.18;  // speed multiplier for every match of a combo
 const MAX_SPEED = 900;
-const TRASH_COOLDOWN = 3;    // seconds before the discard bin can be used again
 const DROP_SPEED = 150;      // initial fall speed, px per second
 const GRAVITY = 5000;        // fall acceleration, px per second^2
-const MATCH_POINTS = 10;     // every successful match
+const STAGE_POINTS = [10, 20, 40]; // a match at stage 1 / 2 / 3
 const COMBO_BONUS = 10;      // extra per match once the streak passes COMBO_AFTER
 const COMBO_AFTER = 2;
+const CLEAR_TIME_BONUS = 3;  // seconds gained when two final-stage objects clear
+const TRASH_COOLDOWN = 3;    // seconds before the discard bin can be used again
 const MAX_SAVED_SCORES = 10;
-const STORAGE_KEY = 'dropMergeTown.scores';
+const STORAGE_KEY = 'mergefall.scores';
+const MUTE_KEY = 'mergefall.muted';
 
-// ---- Assets ---------------------------------------------------------------
-// Art lives in  assets/{category}-{stage}.png  (building-1 ... animal-3).
+// ---- Object families ------------------------------------------------------
+// Art lives in  assets/{name}-{stage}.png  (building-1 ... treasure-3).
 // The current files are Microsoft Fluent Emoji 3D (MIT licence); replace any
 // of them to change the art. A missing file falls back to a glyph tile.
+// Families with unlockAt > 0 only start spawning once the score reaches it.
 const ASSET_DIR = 'assets';
 const CATEGORIES = [
-  { name: 'building', color: '#19b8ff', labels: ['Shack', 'House', 'Skyscraper'], glyphs: ['🛖', '🏠', '🏙️'] },
-  { name: 'food',     color: '#ffb21e', labels: ['Wheat', 'Bread', 'Meal'],       glyphs: ['🌾', '🍞', '🍲'] },
-  { name: 'animal',   color: '#ff5fb7', labels: ['Egg', 'Chick', 'Rooster'],      glyphs: ['🥚', '🐤', '🐓'] },
+  { name: 'building', title: 'Buildings', color: '#19b8ff', unlockAt: 0,   labels: ['Shack', 'House', 'Skyscraper'], glyphs: ['🛖', '🏠', '🏙️'] },
+  { name: 'food',     title: 'Food',      color: '#ffb21e', unlockAt: 0,   labels: ['Wheat', 'Bread', 'Meal'],       glyphs: ['🌾', '🍞', '🍲'] },
+  { name: 'animal',   title: 'Animals',   color: '#ff5fb7', unlockAt: 0,   labels: ['Egg', 'Chick', 'Rooster'],      glyphs: ['🥚', '🐤', '🐓'] },
+  { name: 'nature',   title: 'Nature',    color: '#2ecc71', unlockAt: 50,  labels: ['Seed', 'Plant', 'Tree'],        glyphs: ['🌱', '🪴', '🌳'] },
+  { name: 'treasure', title: 'Treasure',  color: '#a855f7', unlockAt: 120, labels: ['Coin', 'Gem', 'Crown'],         glyphs: ['🪙', '💎', '👑'] },
 ];
 const LAST_STAGE = 2;
 
@@ -45,6 +50,7 @@ const boardEl = $('board');
 const pieceEl = $('piece');
 const pieceObjEl = pieceEl.querySelector('.obj');
 const beamEl = $('beam');
+const shadowEl = $('drop-shadow');
 const slotsEl = $('slots');
 const overlayEl = $('overlay');
 const scoreEl = $('score');
@@ -52,6 +58,7 @@ const streakEl = $('streak');
 const nextEl = $('next');
 const timeEl = $('time');
 const trashEl = $('btn-trash');
+const soundEl = $('btn-sound');
 const screens = {
   menu: $('screen-menu'),
   dashboard: $('screen-dashboard'),
@@ -66,9 +73,12 @@ for (let i = 0; i < SLOT_COUNT; i++) {
   slot.className = 'slot';
   const well = document.createElement('div');
   well.className = 'well';
+  const stand = document.createElement('div');
+  stand.className = 'stand'; // keeps the object upright on the tilted platform
   const obj = document.createElement('div');
   obj.className = 'obj empty';
-  well.appendChild(obj);
+  stand.appendChild(obj);
+  well.appendChild(stand);
   slot.appendChild(well);
   slot.addEventListener('pointerdown', (e) => {
     e.stopPropagation(); // a slot click swaps, it never drops
@@ -78,6 +88,32 @@ for (let i = 0; i < SLOT_COUNT; i++) {
   slotEls.push(slot);
   wellEls.push(well);
   slotObjEls.push(obj);
+}
+
+// The menu's list of families and their three stages.
+function buildChains() {
+  const list = $('chains');
+  list.replaceChildren();
+  CATEGORIES.forEach((category, cat) => {
+    const li = document.createElement('li');
+    li.title = category.title;
+    category.labels.forEach((label, stage) => {
+      if (stage) li.append('›');
+      const img = document.createElement('img');
+      img.src = assetPath({ cat, stage });
+      img.alt = label;
+      li.appendChild(img);
+    });
+    if (category.unlockAt) {
+      li.classList.add('locked');
+      const lock = document.createElement('span');
+      lock.className = 'lock';
+      lock.textContent = `🔒 ${category.unlockAt}`;
+      li.appendChild(lock);
+      li.title += ` (unlocks at ${category.unlockAt} points)`;
+    }
+    list.appendChild(li);
+  });
 }
 
 // Restart a CSS animation class on an element.
@@ -115,17 +151,33 @@ function setObj(el, obj) {
   }
 }
 
-// ---- Layout (measured, so the board can be any size) -----------------------
+// ---- Layout ---------------------------------------------------------------
+// The slot row is tilted in CSS, so positions are measured from the rendered
+// rectangles (which include transforms) rather than from offsetTop/Left.
 let pieceSize = 0;
 let slotCenters = [];
-let landY = 0;
+let slotRects = []; // where each slot's standing object appears, in board px
+let landY = 0;      // piece top when it has landed
+const PIECE_START_Y = 12;
 
 function layout() {
+  const board = boardEl.getBoundingClientRect();
   pieceSize = pieceEl.offsetWidth;
-  slotCenters = slotEls.map((el) => el.offsetLeft + el.offsetWidth / 2);
-  landY = slotsEl.offsetTop + (slotEls[0].offsetHeight - pieceSize) / 2;
-  beamEl.style.width = `${slotEls[0].offsetWidth}px`;
+  slotRects = slotObjEls.map((el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left - board.left + r.width / 2, top: r.top - board.top, bottom: r.bottom - board.top };
+  });
+  slotCenters = slotRects.map((r) => r.x);
+  landY = slotRects[0].bottom - pieceSize;
+  beamEl.style.width = `${slotEls[0].getBoundingClientRect().width}px`;
+  shadowEl.style.width = `${pieceSize * 0.9}px`;
+  shadowEl.style.height = `${pieceSize * 0.26}px`;
   resizeFx();
+  if (shownTarget >= 0) {
+    const t = shownTarget;
+    shownTarget = -1;
+    showTarget(t);
+  }
 }
 
 function nearestSlot(x) {
@@ -143,9 +195,69 @@ function showTarget(i) {
   shownTarget = i;
   if (i >= 0) {
     slotEls[i].classList.add('target');
-    beamEl.style.transform = `translateX(${slotCenters[i] - slotEls[i].offsetWidth / 2}px)`;
+    beamEl.style.transform = `translateX(${slotCenters[i] - beamEl.offsetWidth / 2}px)`;
   }
   beamEl.classList.toggle('hidden', i < 0);
+}
+
+// ---- Sound (synthesised, no files) ----------------------------------------
+// Each sound is a list of notes: f = frequency, to = slide target, d = length
+// in seconds, v = volume, at = delay from the start.
+const SOUNDS = {
+  drop:    [{ f: 700, to: 250, d: 0.16, type: 'triangle', v: 0.12 }],
+  land:    [{ f: 150, to: 90, d: 0.14, type: 'sine', v: 0.3 }],
+  merge:   [{ f: 523, d: 0.09, type: 'triangle', v: 0.18 }, { f: 784, d: 0.16, type: 'triangle', v: 0.18, at: 0.08 }],
+  clear:   [523, 659, 784, 1047].map((f, i) => ({ f, d: 0.18, type: 'triangle', v: 0.18, at: i * 0.07 })),
+  miss:    [{ f: 180, to: 60, d: 0.35, type: 'sawtooth', v: 0.14 }],
+  discard: [{ f: 320, to: 180, d: 0.08, type: 'square', v: 0.05 }],
+  swap:    [{ f: 440, to: 660, d: 0.1, type: 'sine', v: 0.15 }],
+  unlock:  [659, 880, 1319].map((f, i) => ({ f, d: 0.28, type: 'sine', v: 0.18, at: i * 0.1 })),
+  tick:    [{ f: 880, d: 0.05, type: 'square', v: 0.035 }],
+  over:    [523, 392, 330].map((f, i) => ({ f, d: 0.32, type: 'triangle', v: 0.18, at: i * 0.18 })),
+};
+
+let audioCtx = null;
+let muted = false;
+try {
+  muted = localStorage.getItem(MUTE_KEY) === '1';
+} catch {
+  // storage unavailable: sound just starts on
+}
+
+function play(name) {
+  if (muted) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch {
+    return; // no Web Audio: play silently
+  }
+  const now = audioCtx.currentTime;
+  for (const n of SOUNDS[name]) {
+    const t = now + (n.at || 0);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = n.type;
+    osc.frequency.setValueAtTime(n.f, t);
+    if (n.to) osc.frequency.exponentialRampToValueAtTime(n.to, t + n.d);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(n.v, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + n.d);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + n.d + 0.05);
+  }
+}
+
+function setMuted(value) {
+  muted = value;
+  soundEl.querySelector('.icon').textContent = muted ? '🔇' : '🔊';
+  soundEl.classList.toggle('off', muted);
+  try {
+    localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
+  } catch {
+    // storage unavailable: the choice lasts for this page only
+  }
 }
 
 // ---- Particle effects -----------------------------------------------------
@@ -239,7 +351,7 @@ function flashSlot(i, kind) {
 }
 
 function slotPoint(i) {
-  return { x: slotCenters[i], y: slotsEl.offsetTop + slotEls[i].offsetHeight / 2 };
+  return { x: slotCenters[i], y: (slotRects[i].top + slotRects[i].bottom) / 2 };
 }
 
 function floatText(i, text, combo) {
@@ -247,7 +359,16 @@ function floatText(i, text, combo) {
   el.className = combo ? 'float-text combo' : 'float-text';
   el.textContent = text;
   el.style.left = `${slotCenters[i]}px`;
-  el.style.top = `${slotsEl.offsetTop}px`;
+  el.style.top = `${slotRects[i].top}px`;
+  el.addEventListener('animationend', () => el.remove());
+  boardEl.appendChild(el);
+}
+
+// Big centred message, e.g. "+3s" or "Nature unlocked!".
+function announce(text, kind = '') {
+  const el = document.createElement('div');
+  el.className = `announce ${kind}`;
+  el.textContent = text;
   el.addEventListener('animationend', () => el.remove());
   boardEl.appendChild(el);
 }
@@ -256,6 +377,7 @@ function fxLand(i, obj) {
   const { x, y } = slotPoint(i);
   retrigger(wellEls[i], 'land');
   burst(x, y + pieceSize / 3, [CATEGORIES[obj.cat].color], 10, { speed: 160, life: 0.4, lift: 60 });
+  play('land');
 }
 
 function fxMerge(i, points, combo, cleared) {
@@ -265,6 +387,7 @@ function fxMerge(i, points, combo, cleared) {
   shockwave(x, y, cleared ? '#ffb300' : '#12c27a');
   burst(x, y, cleared ? CLEAR_COLORS : MERGE_COLORS, cleared ? 90 : 42, { speed: cleared ? 520 : 360 });
   floatText(i, combo ? `+${points} COMBO` : `+${points}`, combo);
+  play(cleared ? 'clear' : 'merge');
 }
 
 function fxMismatch(i) {
@@ -274,6 +397,7 @@ function fxMismatch(i) {
   shockwave(x, y, '#ff3b5c');
   burst(x, y, MISS_COLORS, 30, { speed: 420, gravity: 1100, life: 0.9, shard: true });
   burst(x, y, MISS_COLORS, 18, { speed: 260, life: 0.5 });
+  play('miss');
 }
 
 // ---- State ----------------------------------------------------------------
@@ -282,7 +406,9 @@ let piece = null;  // the object currently moving / falling
 let nextObj = null;
 let score = 0;
 let streak = 0;    // consecutive successful matches
+let unlocked = 0;  // how many families (from the front of CATEGORIES) can spawn
 let timeLeft = GAME_SECONDS;
+let lastSec = 0;   // last whole second shown, for the countdown tick
 let trashCooldown = 0; // seconds until the bin is ready
 let running = false;
 let lastFrame = 0;
@@ -291,8 +417,12 @@ function same(a, b) {
   return a.cat === b.cat && a.stage === b.stage;
 }
 
+function unlockedCount() {
+  return CATEGORIES.filter((c) => c.unlockAt <= score).length;
+}
+
 function randomBase() {
-  return { cat: Math.floor(Math.random() * CATEGORIES.length), stage: 0 };
+  return { cat: Math.floor(Math.random() * unlocked), stage: 0 };
 }
 
 // ---- Screens --------------------------------------------------------------
@@ -347,7 +477,9 @@ function startGame() {
   slots = new Array(SLOT_COUNT).fill(null);
   score = 0;
   streak = 0;
+  unlocked = unlockedCount();
   timeLeft = GAME_SECONDS;
+  lastSec = GAME_SECONDS;
   trashCooldown = 0;
   nextObj = randomBase();
   running = true;
@@ -364,14 +496,18 @@ function endGame() {
   render();
   setObj(pieceObjEl, null);
   showTarget(-1);
+  shadowEl.classList.add('hidden');
+  const best = loadScores()[0];
+  $('gameover-title').textContent = score > 0 && (!best || score > best.score) ? 'New record! 🏆' : "Time's up!";
   $('final-score').textContent = score;
   $('save-form').classList.remove('hidden');
   showScreen('gameover');
   $('player-name').focus();
+  play('over');
 }
 
 function spawnPiece() {
-  piece = { ...nextObj, x: 0, y: 12, vy: 0, dir: 1, falling: false, targetSlot: 0 };
+  piece = { ...nextObj, x: 0, y: PIECE_START_Y, vy: 0, dir: 1, lean: 0, falling: false, targetSlot: 0 };
   nextObj = randomBase();
   retrigger(pieceEl, 'spawn');
 }
@@ -381,6 +517,7 @@ function dropPiece() {
   piece.targetSlot = nearestSlot(piece.x + pieceSize / 2);
   piece.vy = DROP_SPEED;
   piece.falling = true;
+  play('drop');
 }
 
 // Throw the moving object away and bring in the next one. This is the way out
@@ -391,6 +528,7 @@ function discardPiece() {
     ['#9aa3c7', '#c7cdea', CATEGORIES[piece.cat].color], 18, { speed: 220, life: 0.5 });
   trashCooldown = TRASH_COOLDOWN;
   spawnPiece();
+  play('discard');
   render();
 }
 
@@ -405,7 +543,21 @@ function swapWithSlot(i) {
   shockwave(x, y, '#19b8ff');
   retrigger(wellEls[i], 'land');
   retrigger(pieceEl, 'spawn');
+  play('swap');
   render();
+}
+
+// Bring in any family whose score threshold has just been passed.
+function checkUnlocks() {
+  const now = unlockedCount();
+  if (now <= unlocked) return;
+  const names = CATEGORIES.slice(unlocked, now).map((c) => c.title).join(' & ');
+  unlocked = now;
+  setTimeout(() => {
+    if (!running) return;
+    announce(`${names} unlocked!`, 'unlock');
+    play('unlock');
+  }, 450);
 }
 
 // ---- Match / mismatch rules -----------------------------------------------
@@ -427,15 +579,18 @@ function resolveDrop(i, obj) {
 
   streak++;
   const combo = streak > COMBO_AFTER;
-  const points = MATCH_POINTS + (combo ? COMBO_BONUS : 0);
+  const points = STAGE_POINTS[current.stage] + (combo ? COMBO_BONUS : 0);
   score += points;
   const cleared = current.stage === LAST_STAGE;
   if (cleared) {
     slots[i] = null; // two final-stage objects clear the slot
+    timeLeft += CLEAR_TIME_BONUS;
+    announce(`+${CLEAR_TIME_BONUS}s`, 'time');
   } else {
     current.stage++;
   }
   fxMerge(i, points, combo, cleared);
+  checkUnlocks();
 }
 
 // ---- Loop -----------------------------------------------------------------
@@ -444,6 +599,11 @@ function update(dt) {
   if (timeLeft <= 0) {
     endGame();
     return;
+  }
+  const sec = Math.ceil(timeLeft);
+  if (sec !== lastSec) {
+    lastSec = sec;
+    if (sec <= 5) play('tick');
   }
 
   trashCooldown = Math.max(0, trashCooldown - dt);
@@ -461,6 +621,9 @@ function update(dt) {
       piece.x = 0;
       piece.dir = 1;
     }
+    // Lean into the direction of travel, more at higher speed.
+    const targetLean = piece.dir * 6 * (speed / BASE_SPEED);
+    piece.lean += (targetLean - piece.lean) * Math.min(1, dt * 8);
     showTarget(nearestSlot(piece.x + pieceSize / 2));
   } else {
     // Gravity fall, easing sideways onto the centre of the target slot.
@@ -468,6 +631,7 @@ function update(dt) {
     piece.x += (targetX - piece.x) * Math.min(1, dt * 14);
     piece.vy += GRAVITY * dt;
     piece.y += piece.vy * dt;
+    piece.lean *= Math.max(0, 1 - dt * 12);
     burst(piece.x + pieceSize / 2, piece.y + pieceSize / 2, [CATEGORIES[piece.cat].color], 1,
       { speed: 40, gravity: 0, life: 0.35, lift: 0 });
     if (piece.y >= landY) {
@@ -509,7 +673,18 @@ function render() {
   if (running) {
     setObj(nextEl, nextObj);
     setObj(pieceObjEl, piece);
-    pieceEl.style.transform = `translate3d(${piece.x}px, ${piece.y}px, 0)`;
+    pieceEl.style.transform = `translate3d(${piece.x}px, ${piece.y}px, 0) rotate(${piece.lean}deg)`;
+
+    // Shadow on the target platform that grows as the object comes down.
+    shadowEl.classList.toggle('hidden', !piece.falling);
+    if (piece.falling) {
+      const p = Math.min(1, Math.max(0, (piece.y - PIECE_START_Y) / (landY - PIECE_START_Y)));
+      const r = slotRects[piece.targetSlot];
+      shadowEl.style.left = `${r.x}px`;
+      shadowEl.style.top = `${r.bottom - 4}px`;
+      shadowEl.style.transform = `translate(-50%, -50%) scale(${0.45 + 0.55 * p})`;
+      shadowEl.style.opacity = 0.15 + 0.45 * p;
+    }
   }
 }
 
@@ -526,6 +701,10 @@ function frame(now) {
 
 // ---- Input ----------------------------------------------------------------
 document.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyM' && !e.repeat && document.activeElement.tagName !== 'INPUT') {
+    setMuted(!muted);
+    return;
+  }
   if (!running) return; // menus keep normal typing
   if (e.code === 'Space') {
     e.preventDefault(); // stop the page from scrolling
@@ -535,13 +714,18 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+boardEl.addEventListener('pointerdown', () => {
+  if (running) dropPiece();
+});
+
 trashEl.addEventListener('pointerdown', (e) => {
   e.preventDefault(); // keep keyboard focus off the button so Space still drops
   discardPiece();
 });
 
-boardEl.addEventListener('pointerdown', () => {
-  if (running) dropPiece();
+soundEl.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  setMuted(!muted);
 });
 
 window.addEventListener('resize', layout);
@@ -560,6 +744,8 @@ $('save-form').addEventListener('submit', (e) => {
   showDashboard();
 });
 
+buildChains();
+setMuted(muted);
 layout();
 showScreen('menu');
 requestAnimationFrame(frame);
