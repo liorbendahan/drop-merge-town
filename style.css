@@ -1,0 +1,192 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #1b2430;
+  color: #eef2f6;
+  font-family: system-ui, sans-serif;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 1.5rem;
+}
+
+#hud {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px;
+  font-size: 1.2rem;
+}
+
+#board {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
+  height: 520px;
+  overflow: hidden;
+  background: #253246;
+  border: 2px solid #46597a;
+  border-radius: 8px;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+#piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  line-height: 1;
+  will-change: transform;
+}
+
+#slots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 110px;
+  display: flex;
+}
+
+.slot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  line-height: 1;
+  background: #1f2a3a;
+  border-top: 2px solid #46597a;
+  border-right: 2px solid #46597a;
+}
+
+.slot:last-child {
+  border-right: none;
+}
+
+.slot.good {
+  animation: flash-good 0.35s;
+}
+
+.slot.bad {
+  animation: flash-bad 0.35s;
+}
+
+.slot.score {
+  animation: flash-score 0.5s;
+}
+
+@keyframes flash-good {
+  from { background: #3fae6a; }
+}
+
+@keyframes flash-bad {
+  from { background: #c94f4f; }
+}
+
+@keyframes flash-score {
+  from { background: #e8c547; }
+}
+
+.slot.filled {
+  cursor: pointer;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 1.2rem;
+  background: rgba(15, 20, 28, 0.9);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.screen h2,
+.screen p {
+  margin: 0;
+}
+
+button,
+input {
+  width: 100%;
+  padding: 10px 14px;
+  font: inherit;
+  border-radius: 6px;
+  border: 1px solid #6b7c96;
+}
+
+button {
+  background: #3b6fd4;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #4c80e6;
+}
+
+input {
+  background: #101720;
+  color: #eef2f6;
+}
+
+#save-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+#score-list {
+  width: 100%;
+  max-height: 280px;
+  margin: 0;
+  padding-left: 1.6em;
+  overflow-y: auto;
+  text-align: left;
+}
+
+#help {
+  max-width: 600px;
+  text-align: center;
+  color: #a9b6c8;
+}
+
+kbd {
+  padding: 1px 6px;
+  border: 1px solid #6b7c96;
+  border-radius: 4px;
+  background: #2c3a50;
+}
