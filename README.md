@@ -20,8 +20,8 @@ Matches score 10 / 20 / 40 points by stage. From the third match in a row
 every match is a combo worth +10 more, and the spawner speeds up until the
 streak breaks. Six matches in a row start **fever**: double points for 8
 seconds, kept alive by every further match. Merging two final-stage objects
-clears the platform and adds 3 seconds. First-time players get a 3-second
-tutorial.
+clears the platform and adds 3 seconds. First-time players get a 15-second
+tutorial they can skip with Continue.
 
 ## Code layout
 
