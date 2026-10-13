@@ -25,7 +25,7 @@ const CONFIG = Object.freeze({
   // Helpers
   WILD_CHANCE: 0.08,     // chance that a spawned object is a joker
   TRASH_COOLDOWN: 3,     // seconds before the discard bin can be used again
-  TUTORIAL_SECONDS: 3,   // how long the first-play tutorial stays up
+  TUTORIAL_SECONDS: 15,  // how long the first-play tutorial stays up
   MAX_SAVED_SCORES: 10,
 
   STORAGE_KEYS: Object.freeze({
